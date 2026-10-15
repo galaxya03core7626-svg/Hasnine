@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "VisualizerPreset": {
+      "title": "VisualizerPreset",
+      "description": "Saved visualizer preset containing theme, mode, and audio reactive settings",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "theme": { "type": "string" },
+        "visualizerMode": { "type": "string" },
+        "effectIntensity": { "type": "number" },
+        "config": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "theme"]
+    },
+    "WorkspaceNote": {
+      "title": "WorkspaceNote",
+      "description": "Lyrics, setlist, or imported Google Docs/Slides text linked with the visualizer",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "source": { "type": "string" },
+        "sourceId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "content"]
+    },
+    "CustomPalette": {
+      "title": "CustomPalette",
+      "description": "Custom color palette for the visualizer",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "primary": { "type": "string" },
+        "secondary": { "type": "string" },
+        "accent": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "primary", "secondary", "accent"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document"
+    },
+    "/users/{userId}/presets/{presetId}": {
+      "schema": "VisualizerPreset",
+      "description": "User saved visualizer configurations"
+    },
+    "/users/{userId}/workspaceNotes/{noteId}": {
+      "schema": "WorkspaceNote",
+      "description": "User saved lyrics, notes, or imported Google Docs/Slides content"
+    },
+    "/users/{userId}/palettes/{paletteId}": {
+      "schema": "CustomPalette",
+      "description": "User saved custom color palettes"
+    }
+  }
+}

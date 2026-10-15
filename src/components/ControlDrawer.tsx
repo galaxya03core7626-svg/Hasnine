@@ -37,6 +37,7 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Cloud,
 } from 'lucide-react';
 import {
   VisualizerConfig,
@@ -54,6 +55,7 @@ import { BUILT_IN_TRACKS, AudioEngine } from '../engine/AudioEngine';
 import { MediaManager } from '../engine/MediaManager';
 import { generateStandaloneHtml } from '../utils/singleHtmlExporter';
 import { FrequencySpectrumHUD } from './FrequencySpectrumHUD';
+import { WorkspaceTab } from './WorkspaceTab';
 
 interface ControlDrawerProps {
   isOpen: boolean;
@@ -73,7 +75,7 @@ interface ControlDrawerProps {
   onCaptureSnapshot: () => void;
 }
 
-type TabKey = 'audio' | 'reactivity' | 'visuals' | 'themes' | 'media' | 'text' | 'export' | 'shortcuts';
+type TabKey = 'audio' | 'reactivity' | 'visuals' | 'themes' | 'media' | 'text' | 'workspace' | 'export' | 'shortcuts';
 
 export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   isOpen,
@@ -386,6 +388,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             { id: 'themes', label: 'Themes & Palettes', icon: Palette },
             { id: 'media', label: 'Media Gallery', icon: Video },
             { id: 'text', label: 'Dynamic Text', icon: Type },
+            { id: 'workspace', label: 'Google Workspace', icon: Cloud },
             { id: 'export', label: 'Export & Settings', icon: Download },
             { id: 'shortcuts', label: 'Shortcuts', icon: HelpCircle },
           ].map((tab) => {
@@ -1769,6 +1772,21 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB: GOOGLE WORKSPACE */}
+          {activeTab === 'workspace' && (
+            <WorkspaceTab
+              config={config}
+              onUpdateConfig={onUpdateConfig}
+              onApplyPreset={(theme, mode, intensity) => {
+                onUpdateConfig({
+                  theme,
+                  visualizerMode: mode,
+                  effectIntensity: intensity,
+                });
+              }}
+            />
           )}
 
           {/* TAB 8: SHORTCUTS */}
