@@ -89,6 +89,9 @@ export interface CustomPalette {
   waveformColor: string;
 }
 
+export type DisplayAspectRatio = '16:9' | '9:16' | 'responsive';
+export type VideoResolution = 'FHD' | 'HD';
+
 export interface VisualizerConfig {
   theme: ThemeType | string;
   isRandomTheme: boolean;
@@ -98,6 +101,9 @@ export interface VisualizerConfig {
   bloomStrength: number;   // 0.0 - 1.5
   particleDensity: number; // 0.5 - 2.0
   particleSize: number;    // 0.5 - 3.0
+  particleVortexSpeed: number; // 0.0 - 3.0
+  particleReactivity: number; // 0.0 - 2.0
+  particleBurstDensity: number; // 0.5 - 3.0
   cameraKick: boolean;     // camera responds to bass beat kick
   transitionType: TransitionType;
   isRandomTransition: boolean;
@@ -113,6 +119,9 @@ export interface VisualizerConfig {
   showFrequencySpectrumHUD: boolean;
   qualityPreset: 'low' | 'medium' | 'high';
   showFPS: boolean;
+  aspectRatio: DisplayAspectRatio; // '16:9' (1920x1080 FHD), '9:16' (1080x1920 FHD), or 'responsive'
+  videoResolution: VideoResolution; // 'FHD' (1080p Full HD) or 'HD' (720p)
+  showAspectGuides: boolean; // Show safe-area guides for video creators (Reels/TikTok/YouTube)
 }
 
 export interface VisualizerAPI {
@@ -121,6 +130,7 @@ export interface VisualizerAPI {
   togglePlay: () => Promise<void>;
   setTheme: (theme: ThemeType) => void;
   setVisualizer: (mode: VisualizerMode) => void;
+  setAspectRatio: (aspect: DisplayAspectRatio) => void;
   randomize: () => void;
   nextMedia: () => void;
   prevMedia: () => void;

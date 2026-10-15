@@ -495,9 +495,9 @@ export class VisualEngine {
 
   // --- RESIZE ---
 
-  public resize() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+  public resize(forcedWidth?: number, forcedHeight?: number) {
+    this.width = Math.round(forcedWidth || this.container.clientWidth || window.innerWidth);
+    this.height = Math.round(forcedHeight || this.container.clientHeight || window.innerHeight);
 
     if (this.bgCanvas) {
       this.bgCanvas.width = this.width;
@@ -508,9 +508,14 @@ export class VisualEngine {
       this.hudCanvas.height = this.height;
     }
     if (this.camera && this.renderer) {
-      this.camera.aspect = this.width / this.height;
+      const aspect = this.width / this.height;
+      this.camera.aspect = aspect;
+      // Adjust camera distance for portrait (9:16) vs landscape (16:9) to keep visualizer beautifully framed
+      this.cameraBaseZ = aspect < 1.0 ? 46 : 32;
+      this.camera.position.z = this.cameraBaseZ + this.cameraKickOffset;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(this.width, this.height);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     }
   }
 
@@ -835,7 +840,8 @@ export class VisualEngine {
       this.cameraShakeY = (Math.random() - 0.5) * 1.0 * intensity * freqCfg.bassBurstIntensity;
 
       // Heavy 3D Bass Particle Explosion
-      const burstSize = Math.floor(80 * (1 + audio.beatStrength) * config.particleDensity * freqCfg.bassBurstIntensity);
+      const burstDensity = config.particleBurstDensity ?? 1.0;
+      const burstSize = Math.floor(80 * (1 + audio.beatStrength) * config.particleDensity * freqCfg.bassBurstIntensity * burstDensity);
       this.trigger3DBurst(burstSize, themeDef.colors.primary, themeDef.colors.secondary, 1.4 * intensity);
 
       // Bass Shockwave Ring Explosion
@@ -877,10 +883,12 @@ export class VisualEngine {
 
     // A. Galaxy Particles (with Treble Shimmering Modulation)
     if (this.galaxyParticles && this.galaxyGeo && this.galaxyParticles.visible) {
-      this.galaxyParticles.rotation.y = t * 0.08 + audio.mid * 0.3 * freqCfg.midPulseIntensity;
-      this.galaxyParticles.rotation.x = Math.sin(t * 0.04) * 0.2;
+      const vortexSpd = config.particleVortexSpeed ?? 1.0;
+      const react = config.particleReactivity ?? 1.0;
+      this.galaxyParticles.rotation.y = t * 0.08 * vortexSpd + audio.mid * 0.3 * freqCfg.midPulseIntensity * react;
+      this.galaxyParticles.rotation.x = Math.sin(t * 0.04) * 0.2 * react;
 
-      const scale = (1.0 + audio.bass * 0.3 * intensity * freqCfg.bassBurstIntensity) * config.particleSize;
+      const scale = (1.0 + audio.bass * 0.3 * intensity * freqCfg.bassBurstIntensity * react) * config.particleSize;
       this.galaxyParticles.scale.set(scale, scale, scale);
 
       // Treble Shimmer: brighten particles dynamically

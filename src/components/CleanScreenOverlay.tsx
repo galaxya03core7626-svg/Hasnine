@@ -119,7 +119,7 @@ export const CleanScreenOverlay: React.FC<CleanScreenOverlayProps> = ({
 
   return (
     <div
-      className={`fixed ${positionClasses} z-20 pointer-events-none text-center select-none will-change-transform`}
+      className={`absolute ${positionClasses} z-20 w-full max-w-[92%] px-4 pointer-events-none text-center select-none will-change-transform`}
       style={{
         fontFamily: fontFam,
         transform: dynamicTransform,

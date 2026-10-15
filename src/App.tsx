@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   VisualizerConfig,
   AudioAnalysis,
@@ -11,6 +11,7 @@ import {
   VisualizerMode,
   OverlayType,
   VisualizerAPI,
+  DisplayAspectRatio,
 } from './types/visualizer';
 import { ThemeManager, INITIAL_CUSTOM_PALETTES } from './engine/ThemeManager';
 import { AudioEngine } from './engine/AudioEngine';
@@ -19,6 +20,7 @@ import { VisualEngine } from './engine/VisualEngine';
 import { CleanScreenOverlay } from './components/CleanScreenOverlay';
 import { ControlDrawer } from './components/ControlDrawer';
 import { FrequencySpectrumHUD } from './components/FrequencySpectrumHUD';
+import { Monitor, Smartphone, Maximize } from 'lucide-react';
 
 // Declare global window.visualizer API
 declare global {
@@ -27,15 +29,21 @@ declare global {
   }
 }
 
-const DEFAULT_CONFIG: VisualizerConfig = {
+export const DEFAULT_CONFIG: VisualizerConfig = {
   theme: 'Cyberpunk',
   isRandomTheme: false,
   visualizerMode: 'cosmic',
   isRandomVisualizer: false,
+  aspectRatio: '16:9', // '16:9' FHD (1920x1080), '9:16' FHD (1080x1920), or 'responsive'
+  videoResolution: 'FHD',
+  showAspectGuides: false,
   effectIntensity: 1.0,
   bloomStrength: 0.9,
   particleDensity: 1.0,
   particleSize: 1.2,
+  particleVortexSpeed: 1.0,
+  particleReactivity: 1.0,
+  particleBurstDensity: 1.0,
   cameraKick: true,
   transitionType: 'glitch',
   isRandomTransition: false,
@@ -149,16 +157,92 @@ export default function App() {
     });
   }, [handleUpdateConfig]);
 
-  // --- RECORDING REAL-TIME VIDEO CLIP ---
+  // Window size tracking for responsive 16:9 and 9:16 aspect ratio framing
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    height: typeof window !== 'undefined' ? window.innerHeight : 1080,
+  });
+
+  useEffect(() => {
+    const handleWinResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleWinResize);
+    return () => window.removeEventListener('resize', handleWinResize);
+  }, []);
+
+  // Compute exact stage dimensions based on selected aspect ratio (16:9, 9:16, or responsive)
+  const stageDimensions = useMemo(() => {
+    const { aspectRatio } = config;
+    const winW = windowSize.width;
+    const winH = windowSize.height;
+
+    if (aspectRatio === 'responsive') {
+      return { width: winW, height: winH, styleWidth: '100%', styleHeight: '100%', isVertical: winW < winH };
+    }
+
+    const targetRatio = aspectRatio === '16:9' ? 16 / 9 : 9 / 16;
+    const currentRatio = winW / winH;
+    let w = winW;
+    let h = winH;
+
+    if (currentRatio > targetRatio) {
+      // Window is wider than target ratio -> pillarbox (fit height)
+      h = winH;
+      w = Math.round(winH * targetRatio);
+    } else {
+      // Window is taller than target ratio -> letterbox (fit width)
+      w = winW;
+      h = Math.round(winW / targetRatio);
+    }
+
+    return {
+      width: w,
+      height: h,
+      styleWidth: `${w}px`,
+      styleHeight: `${h}px`,
+      isVertical: aspectRatio === '9:16',
+    };
+  }, [config.aspectRatio, windowSize]);
+
+  // Keep VisualEngine resized to stage dimensions
+  useEffect(() => {
+    if (visualEngineRef.current) {
+      visualEngineRef.current.resize(stageDimensions.width, stageDimensions.height);
+    }
+  }, [stageDimensions]);
+
+  // Quick Aspect Ratio Cycler
+  const handleCycleAspectRatio = useCallback(() => {
+    handleUpdateConfig({
+      aspectRatio:
+        config.aspectRatio === '16:9'
+          ? '9:16'
+          : config.aspectRatio === '9:16'
+          ? 'responsive'
+          : '16:9',
+    });
+  }, [config.aspectRatio, handleUpdateConfig]);
+
+  // --- RECORDING REAL-TIME VIDEO CLIP IN TRUE FHD (1080p) ---
   const handleStartRecording = useCallback(() => {
     if (!bgCanvasRef.current || !threeCanvasRef.current || !hudCanvasRef.current) return;
 
     try {
-      // Create offscreen composite canvas for recording all 3 layers merged
+      const isVertical = configRef.current.aspectRatio === '9:16';
+      // True Full High Definition (FHD 1080p): 1920x1080 for 16:9 or 1080x1920 for 9:16
+      const fhdWidth = isVertical ? 1080 : 1920;
+      const fhdHeight = isVertical ? 1920 : 1080;
+
+      // Create offscreen composite canvas for recording all 3 layers merged at true FHD
       const recordCanvas = document.createElement('canvas');
-      recordCanvas.width = window.innerWidth;
-      recordCanvas.height = window.innerHeight;
-      const rCtx = recordCanvas.getContext('2d');
+      recordCanvas.width = fhdWidth;
+      recordCanvas.height = fhdHeight;
+      const rCtx = recordCanvas.getContext('2d', { alpha: false });
+      if (rCtx) {
+        rCtx.imageSmoothingEnabled = true;
+        rCtx.imageSmoothingQuality = 'high';
+      }
 
       const canvasStream = recordCanvas.captureStream(60);
       const audioStream = audioEngineRef.current.getAudioStream();
@@ -175,7 +259,7 @@ export default function App() {
 
       const recorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 6000000,
+        videoBitsPerSecond: 14000000, // 14 Mbps Full HD high bitrate
       });
 
       recordedChunksRef.current = [];
@@ -190,7 +274,8 @@ export default function App() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `pulsewave-visualizer-${Date.now()}.webm`;
+        const aspectTag = isVertical ? '9x16-portrait-FHD' : '16x9-landscape-FHD';
+        a.download = `pulsewave-${aspectTag}-${Date.now()}.webm`;
         a.click();
         URL.revokeObjectURL(url);
         setIsRecording(false);
@@ -203,10 +288,11 @@ export default function App() {
           return;
         }
         if (rCtx && bgCanvasRef.current && threeCanvasRef.current && hudCanvasRef.current) {
-          rCtx.clearRect(0, 0, recordCanvas.width, recordCanvas.height);
-          rCtx.drawImage(bgCanvasRef.current, 0, 0);
-          rCtx.drawImage(threeCanvasRef.current, 0, 0);
-          rCtx.drawImage(hudCanvasRef.current, 0, 0);
+          rCtx.fillStyle = '#000000';
+          rCtx.fillRect(0, 0, fhdWidth, fhdHeight);
+          rCtx.drawImage(bgCanvasRef.current, 0, 0, fhdWidth, fhdHeight);
+          rCtx.drawImage(threeCanvasRef.current, 0, 0, fhdWidth, fhdHeight);
+          rCtx.drawImage(hudCanvasRef.current, 0, 0, fhdWidth, fhdHeight);
         }
       }, 1000 / 60);
 
@@ -224,23 +310,32 @@ export default function App() {
     }
   }, []);
 
-  // Snapshot PNG
+  // Snapshot PNG in true FHD
   const handleCaptureSnapshot = useCallback(() => {
     if (!bgCanvasRef.current || !threeCanvasRef.current || !hudCanvasRef.current) return;
+    const isVertical = configRef.current.aspectRatio === '9:16';
+    const fhdWidth = isVertical ? 1080 : 1920;
+    const fhdHeight = isVertical ? 1920 : 1080;
+
     const snapCanvas = document.createElement('canvas');
-    snapCanvas.width = window.innerWidth;
-    snapCanvas.height = window.innerHeight;
+    snapCanvas.width = fhdWidth;
+    snapCanvas.height = fhdHeight;
     const sCtx = snapCanvas.getContext('2d');
     if (!sCtx) return;
 
-    sCtx.drawImage(bgCanvasRef.current, 0, 0);
-    sCtx.drawImage(threeCanvasRef.current, 0, 0);
-    sCtx.drawImage(hudCanvasRef.current, 0, 0);
+    sCtx.imageSmoothingEnabled = true;
+    sCtx.imageSmoothingQuality = 'high';
+    sCtx.fillStyle = '#000000';
+    sCtx.fillRect(0, 0, fhdWidth, fhdHeight);
+    sCtx.drawImage(bgCanvasRef.current, 0, 0, fhdWidth, fhdHeight);
+    sCtx.drawImage(threeCanvasRef.current, 0, 0, fhdWidth, fhdHeight);
+    sCtx.drawImage(hudCanvasRef.current, 0, 0, fhdWidth, fhdHeight);
 
     const dataUrl = snapCanvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `pulsewave-snapshot-${Date.now()}.png`;
+    const aspectTag = isVertical ? '9x16-portrait-FHD' : '16x9-landscape-FHD';
+    a.download = `pulsewave-${aspectTag}-${Date.now()}.png`;
     a.click();
   }, []);
 
@@ -342,6 +437,9 @@ export default function App() {
       setVisualizer: (mode: VisualizerMode) => {
         handleUpdateConfig({ visualizerMode: mode });
       },
+      setAspectRatio: (aspect: DisplayAspectRatio) => {
+        handleUpdateConfig({ aspectRatio: aspect });
+      },
       randomize: handleRandomize,
       nextMedia: () => mediaManagerRef.current.next(config.transitionType, config.transitionDuration),
       prevMedia: () => mediaManagerRef.current.prev(config.transitionType, config.transitionDuration),
@@ -367,6 +465,11 @@ export default function App() {
         case ' ':
           e.preventDefault();
           audioEngineRef.current.togglePlay();
+          break;
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          handleCycleAspectRatio();
           break;
         case 'h':
         case 'H':
@@ -457,35 +560,111 @@ export default function App() {
 
   return (
     <main
-      ref={containerRef}
       onMouseMove={handleMouseMove}
-      className="relative w-screen h-screen overflow-hidden bg-black select-none"
+      className="relative w-screen h-screen overflow-hidden bg-black flex items-center justify-center select-none"
     >
-      {/* LAYER 1: Background Media & GPU Transition Canvas */}
-      <canvas
-        ref={bgCanvasRef}
-        className="absolute inset-0 w-full h-full z-0 block pointer-events-none"
-      />
+      {/* Ambient background glow when 16:9 or 9:16 has letterbox/pillarbox borders */}
+      {config.aspectRatio !== 'responsive' && (
+        <div
+          className="absolute inset-0 pointer-events-none opacity-25 transition-all duration-700 blur-3xl scale-110"
+          style={{
+            background: `radial-gradient(circle at center, ${themeDef.colors.primary}55 0%, ${themeDef.colors.secondary}22 50%, transparent 80%)`,
+          }}
+        />
+      )}
 
-      {/* LAYER 2: Three.js WebGL 3D Canvas */}
-      <canvas
-        ref={threeCanvasRef}
-        className="absolute inset-0 w-full h-full z-10 block pointer-events-none"
-      />
+      {/* Visualizer Stage Container - precise 16:9, 9:16, or responsive Full HD viewport */}
+      <div
+        id="visualizer-stage"
+        ref={containerRef}
+        className="relative overflow-hidden transition-all duration-300 flex items-center justify-center select-none"
+        style={{
+          width: stageDimensions.styleWidth,
+          height: stageDimensions.styleHeight,
+          boxShadow:
+            config.aspectRatio !== 'responsive'
+              ? `0 0 50px rgba(0,0,0,0.85), 0 0 30px ${themeDef.colors.primary}22`
+              : 'none',
+          border: config.aspectRatio !== 'responsive' ? `1px solid rgba(255,255,255,0.12)` : 'none',
+        }}
+      >
+        {/* Creator Safe Area Guides (Optional overlay for 9:16 TikTok/Reels and 16:9 Title Safe) */}
+        {config.showAspectGuides && (
+          <div className="absolute inset-0 z-30 pointer-events-none border border-white/20">
+            {config.aspectRatio === '9:16' ? (
+              <>
+                <div className="absolute top-0 left-0 right-0 h-[12%] border-b border-rose-500/50 bg-rose-500/10 flex items-center justify-center text-[10px] text-rose-300 font-mono tracking-wider">
+                  TOP UI SAFE ZONE (Profile / Search)
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-[22%] border-t border-rose-500/50 bg-rose-500/10 flex items-center justify-center text-[10px] text-rose-300 font-mono tracking-wider">
+                  BOTTOM SAFE ZONE (Captions & Audio Bar)
+                </div>
+                <div className="absolute top-[12%] bottom-[22%] right-0 w-[16%] border-l border-rose-500/50 bg-rose-500/10 flex items-center justify-center text-[9px] text-rose-300 font-mono [writing-mode:vertical-lr] tracking-widest">
+                  RIGHT UI (Action Buttons)
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-[5%] border border-cyan-400/40 flex items-start justify-end p-2 text-[10px] text-cyan-300 font-mono tracking-wider">
+                16:9 TITLE SAFE (90%)
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* LAYER 3: 2D HUD, Waveforms & Overlay Canvas */}
-      <canvas
-        ref={hudCanvasRef}
-        className="absolute inset-0 w-full h-full z-20 block pointer-events-none"
-      />
+        {/* LAYER 1: Background Media & GPU Transition Canvas */}
+        <canvas
+          ref={bgCanvasRef}
+          className="absolute inset-0 w-full h-full z-0 block pointer-events-none"
+        />
 
-      {/* LAYER 4: Clean Screen Single Title Overlay (Only Title on screen, 0 clutter) */}
-      <CleanScreenOverlay config={config} themeDef={themeDef} audioAnalysis={liveAnalysis} />
+        {/* LAYER 2: Three.js WebGL 3D Canvas */}
+        <canvas
+          ref={threeCanvasRef}
+          className="absolute inset-0 w-full h-full z-10 block pointer-events-none"
+        />
+
+        {/* LAYER 3: 2D HUD, Waveforms & Overlay Canvas */}
+        <canvas
+          ref={hudCanvasRef}
+          className="absolute inset-0 w-full h-full z-20 block pointer-events-none"
+        />
+
+        {/* LAYER 4: Clean Screen Single Title Overlay */}
+        <CleanScreenOverlay config={config} themeDef={themeDef} audioAnalysis={liveAnalysis} />
+      </div>
+
+      {/* Floating Quick Aspect Ratio & Quality Switcher - auto-hides when mouse idle */}
+      <div
+        className={`fixed bottom-6 right-36 z-40 flex items-center gap-2 transition-all duration-300 ${
+          isMouseIdle && !isDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-70 hover:opacity-100'
+        }`}
+      >
+        <button
+          onClick={handleCycleAspectRatio}
+          aria-label="Cycle display size and aspect ratio"
+          title="Switch Aspect Ratio: 16:9 FHD, 9:16 FHD, or Full Window (Shortcut: A)"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/60 hover:bg-black/90 text-white/80 hover:text-white border border-white/15 text-xs font-medium tracking-wide shadow-xl backdrop-blur-md hover:scale-105 transition-all"
+        >
+          {config.aspectRatio === '16:9' ? (
+            <Monitor className="w-3.5 h-3.5 text-cyan-400" />
+          ) : config.aspectRatio === '9:16' ? (
+            <Smartphone className="w-3.5 h-3.5 text-rose-400" />
+          ) : (
+            <Maximize className="w-3.5 h-3.5 text-amber-400" />
+          )}
+          <span>
+            {config.aspectRatio === '16:9' ? '16:9 FHD' : config.aspectRatio === '9:16' ? '9:16 FHD' : 'Fit Window'}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-mono">A</span>
+        </button>
+      </div>
 
       {/* LAYER 5: Frequency Spectrum Bar Chart using Recharts in HUD overlay */}
       {config.showFrequencySpectrumHUD && (
         <div
-          className={`fixed bottom-6 left-6 z-20 w-72 sm:w-80 md:w-96 transition-all duration-300 pointer-events-auto ${
+          className={`fixed bottom-6 left-6 z-20 ${
+            config.aspectRatio === '9:16' ? 'w-64 max-w-[80vw]' : 'w-72 sm:w-80 md:w-96'
+          } transition-all duration-300 pointer-events-auto ${
             isMouseIdle && !isDrawerOpen ? 'opacity-35 hover:opacity-100' : 'opacity-95'
           }`}
         >
@@ -511,7 +690,7 @@ export default function App() {
       {/* Optional Clean FPS Display (only if enabled) */}
       {config.showFPS && (
         <div className="fixed top-4 left-4 z-30 font-mono text-xs text-white/40 tracking-wider">
-          {fps} FPS
+          {fps} FPS • {config.aspectRatio.toUpperCase()} {config.videoResolution}
         </div>
       )}
 

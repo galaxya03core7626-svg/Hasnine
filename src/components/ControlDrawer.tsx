@@ -38,6 +38,8 @@ import {
   EyeOff,
   Plus,
   Cloud,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import {
   VisualizerConfig,
@@ -840,6 +842,92 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
           {/* TAB 3: 3D VISUALS */}
           {activeTab === 'visuals' && (
             <div className="space-y-6">
+              {/* DISPLAY SIZE & RESOLUTION (16:9 & 9:16 FHD) */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-white/90">
+                      Video Display Size & Resolution
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    FHD 1080P 60FPS
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    onClick={() => onUpdateConfig({ aspectRatio: '16:9' })}
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
+                      config.aspectRatio === '16:9'
+                        ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-lg'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Monitor className="w-4 h-4 text-cyan-400" />
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10">16:9</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs text-white">16:9 Landscape FHD</div>
+                      <div className="text-[10px] text-white/50 mt-0.5">1920 × 1080 • YouTube & TV</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => onUpdateConfig({ aspectRatio: '9:16' })}
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
+                      config.aspectRatio === '9:16'
+                        ? 'bg-rose-500/20 border-rose-400 text-white shadow-lg'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Smartphone className="w-4 h-4 text-rose-400" />
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10">9:16</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs text-white">9:16 Vertical FHD</div>
+                      <div className="text-[10px] text-white/50 mt-0.5">1080 × 1920 • TikTok & Reels</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => onUpdateConfig({ aspectRatio: 'responsive' })}
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
+                      config.aspectRatio === 'responsive'
+                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Maximize2 className="w-4 h-4 text-amber-400" />
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10">Auto</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs text-white">Fit Window (Dynamic)</div>
+                      <div className="text-[10px] text-white/50 mt-0.5">Fills screen or browser window</div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/10 text-xs text-white/70">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.showAspectGuides}
+                      onChange={(e) => onUpdateConfig({ showAspectGuides: e.target.checked })}
+                      className="w-4 h-4 accent-cyan-400 rounded"
+                    />
+                    <span>Show Safe-Area Guidelines (Mobile UI & Title Safe)</span>
+                  </label>
+                  <div className="text-[11px] text-white/40 font-mono">
+                    Active Output: {config.aspectRatio === '9:16' ? '1080 × 1920 (9:16 FHD)' : '1920 × 1080 (16:9 FHD)'}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
@@ -945,6 +1033,54 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                     value={config.particleSize}
                     onChange={(e) => onUpdateConfig({ particleSize: parseFloat(e.target.value) })}
                     className="w-full accent-cyan-400"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-white/80">
+                    <span>Vortex Rotation Speed</span>
+                    <span className="tabular-nums font-mono">{(config.particleVortexSpeed ?? 1.0).toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="3.0"
+                    step="0.1"
+                    value={config.particleVortexSpeed ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ particleVortexSpeed: parseFloat(e.target.value) })}
+                    className="w-full accent-purple-400"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-white/80">
+                    <span>Audio Particle Reactivity</span>
+                    <span className="tabular-nums font-mono">{(config.particleReactivity ?? 1.0).toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="2.0"
+                    step="0.1"
+                    value={config.particleReactivity ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ particleReactivity: parseFloat(e.target.value) })}
+                    className="w-full accent-pink-400"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-white/80">
+                    <span>Beat Burst Density</span>
+                    <span className="tabular-nums font-mono">{(config.particleBurstDensity ?? 1.0).toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.0"
+                    step="0.1"
+                    value={config.particleBurstDensity ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ particleBurstDensity: parseFloat(e.target.value) })}
+                    className="w-full accent-amber-400"
                   />
                 </div>
 
@@ -1697,12 +1833,17 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-white/80 uppercase tracking-wider">
-                    <Camera className="w-4 h-4 text-cyan-400" />
-                    <span>MediaRecorder Video Export</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-white/80 uppercase tracking-wider">
+                      <Camera className="w-4 h-4 text-cyan-400" />
+                      <span>FHD 1080p Video Export</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      {config.aspectRatio === '9:16' ? '1080 × 1920 (9:16)' : '1920 × 1080 (16:9)'}
+                    </span>
                   </div>
                   <p className="text-xs text-white/50">
-                    Directly captures the GPU canvas visuals and audio synthesizer into a downloadable WebM video file.
+                    Directly captures the multi-layer visualizer visuals and audio in crystal-clear Full HD (60fps, 14 Mbps) formatted in {config.aspectRatio === '9:16' ? '9:16 vertical for Reels & TikTok' : '16:9 widescreen for YouTube & Desktop'}.
                   </p>
                   <div>
                     {isRecording ? (
@@ -1711,23 +1852,23 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                         className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors animate-pulse"
                       >
                         <span className="w-2.5 h-2.5 rounded-full bg-white" />
-                        <span>Stop & Save Video Clip (.webm)</span>
+                        <span>Stop & Save FHD Video Clip (.webm)</span>
                       </button>
                     ) : (
                       <button
                         onClick={onStartRecording}
                         className="w-full py-2.5 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-xs flex items-center justify-center gap-2 border border-white/20 transition-colors"
                       >
-                        <Camera className="w-4 h-4" />
-                        <span>Start Recording Clip</span>
+                        <Camera className="w-4 h-4 text-cyan-400" />
+                        <span>Start Recording {config.aspectRatio === '9:16' ? '9:16 Vertical FHD' : '16:9 Widescreen FHD'}</span>
                       </button>
                     )}
                   </div>
                   <button
                     onClick={onCaptureSnapshot}
-                    className="w-full py-2 px-4 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium border border-white/10 transition-colors"
+                    className="w-full py-2 px-4 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium border border-white/10 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    Take High-Res Still Photo (PNG)
+                    <span>Capture FHD Still Photo (PNG - {config.aspectRatio === '9:16' ? '1080×1920' : '1920×1080'})</span>
                   </button>
                 </div>
 
@@ -1798,6 +1939,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
               <div className="divide-y divide-white/10 rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                 {[
                   { key: 'Space', desc: 'Play / Pause Audio' },
+                  { key: 'A', desc: 'Cycle Aspect Ratio (16:9 FHD, 9:16 FHD, Window)' },
                   { key: 'H or Esc', desc: 'Toggle / Close Controls Drawer' },
                   { key: 'F', desc: 'Toggle Fullscreen Mode' },
                   { key: 'R', desc: 'Randomize Themes, Modes & Visuals' },

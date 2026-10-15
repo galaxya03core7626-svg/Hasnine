@@ -41,7 +41,7 @@ export function generateStandaloneHtml(config: VisualizerConfig): string {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+    canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: block; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
     #bgCanvas { z-index: 1; }
     #threeCanvas { z-index: 2; pointer-events: none; }
     #hudCanvas { z-index: 3; pointer-events: none; }
@@ -209,6 +209,15 @@ export function generateStandaloneHtml(config: VisualizerConfig): string {
       </div>
 
       <div class="control-group">
+        <label>Video Display Size (FHD Quality)</label>
+        <select id="aspectSelect" onchange="setAspect(this.value)">
+          <option value="16:9" ${config.aspectRatio === '16:9' ? 'selected' : ''}>16:9 Landscape FHD (1920x1080)</option>
+          <option value="9:16" ${config.aspectRatio === '9:16' ? 'selected' : ''}>9:16 Vertical FHD (1080x1920)</option>
+          <option value="responsive" ${config.aspectRatio === 'responsive' ? 'selected' : ''}>Full Window (Dynamic Fit)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
         <label>Visual Theme & Style</label>
         <select id="themeSelect" onchange="window.visualizer.setTheme(this.value)">
           <option value="Cyberpunk">Cyberpunk</option>
@@ -229,9 +238,15 @@ export function generateStandaloneHtml(config: VisualizerConfig): string {
       Kinetic: { primary: '#ef4444', secondary: '#ffffff', bg: '#08080a', wave: '#ef4444' }
     };
     let currentTheme = '${config.theme || 'Cyberpunk'}';
+    let currentAspect = '${config.aspectRatio || '16:9'}';
     let textAnimStyle = '${textCfg.animationStyle || 'scale'}';
     let bassMult = 1.0;
     let trebleMult = 1.0;
+
+    function setAspect(val) {
+      currentAspect = val;
+      resize();
+    }
 
     // --- AUDIO ENGINE ---
     let audioCtx = null, analyser = null, masterGain = null, isPlaying = false, synthTimer = null, synthStep = 0;
@@ -319,11 +334,30 @@ export function generateStandaloneHtml(config: VisualizerConfig): string {
     const hudCtx = hudCanvas.getContext('2d');
 
     function resize() {
-      width = window.innerWidth; height = window.innerHeight;
+      const winW = window.innerWidth, winH = window.innerHeight;
+      if (currentAspect === 'responsive') {
+        width = winW; height = winH;
+      } else {
+        const target = currentAspect === '16:9' ? 16 / 9 : 9 / 16;
+        if (winW / winH > target) {
+          height = winH;
+          width = Math.round(winH * target);
+        } else {
+          width = winW;
+          height = Math.round(winW / target);
+        }
+      }
       bgCanvas.width = width; bgCanvas.height = height;
+      bgCanvas.style.width = width + 'px'; bgCanvas.style.height = height + 'px';
       hudCanvas.width = width; hudCanvas.height = height;
+      hudCanvas.style.width = width + 'px'; hudCanvas.style.height = height + 'px';
+      const three = document.getElementById('threeCanvas');
+      if (three) {
+        three.style.width = width + 'px'; three.style.height = height + 'px';
+      }
       if (renderer && camera) {
         camera.aspect = width / height;
+        camera.position.z = width < height ? 45 : 30;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height);
       }
