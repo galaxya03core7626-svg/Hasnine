@@ -1,0 +1,6 @@
+{
+  "name": "PulseWave - Next-Gen Audio Visualizer",
+  "description": "A fully featured, GPU-accelerated music visualizer with Web Audio beat detection, 3D particle bursts, shader transitions, and media rotation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
