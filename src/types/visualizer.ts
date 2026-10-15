@@ -78,8 +78,19 @@ export interface FrequencyReactivityConfig {
   trebleTrailsEnabled: boolean;   // Light trails on high treble
 }
 
+export interface CustomPalette {
+  id: string;
+  name: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  gridColor: string;
+  waveformColor: string;
+}
+
 export interface VisualizerConfig {
-  theme: ThemeType;
+  theme: ThemeType | string;
   isRandomTheme: boolean;
   visualizerMode: VisualizerMode;
   isRandomVisualizer: boolean;
@@ -97,6 +108,9 @@ export interface VisualizerConfig {
   overlayIntensity: number;// 0.1 - 1.5
   textOverlay: DynamicTextOverlayConfig;
   frequencyReactivity: FrequencyReactivityConfig;
+  customPalettes: CustomPalette[];
+  activeCustomPaletteId?: string;
+  showFrequencySpectrumHUD: boolean;
   qualityPreset: 'low' | 'medium' | 'high';
   showFPS: boolean;
 }

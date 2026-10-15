@@ -12,12 +12,13 @@ import {
   OverlayType,
   VisualizerAPI,
 } from './types/visualizer';
-import { ThemeManager } from './engine/ThemeManager';
+import { ThemeManager, INITIAL_CUSTOM_PALETTES } from './engine/ThemeManager';
 import { AudioEngine } from './engine/AudioEngine';
 import { MediaManager } from './engine/MediaManager';
 import { VisualEngine } from './engine/VisualEngine';
 import { CleanScreenOverlay } from './components/CleanScreenOverlay';
 import { ControlDrawer } from './components/ControlDrawer';
+import { FrequencySpectrumHUD } from './components/FrequencySpectrumHUD';
 
 // Declare global window.visualizer API
 declare global {
@@ -64,6 +65,8 @@ const DEFAULT_CONFIG: VisualizerConfig = {
     shockwaveEnabled: true,
     trebleTrailsEnabled: true,
   },
+  customPalettes: INITIAL_CUSTOM_PALETTES,
+  showFrequencySpectrumHUD: true,
   qualityPreset: 'high',
   showFPS: false,
 };
@@ -412,6 +415,19 @@ export default function App() {
           e.preventDefault();
           audioEngineRef.current.setMuted(!audioEngineRef.current.isSoundMuted());
           break;
+        case 'c':
+        case 'C': {
+          e.preventDefault();
+          const nextThm = themeManagerRef.current.cycleNextTheme();
+          handleUpdateConfig({ theme: nextThm });
+          break;
+        }
+        case 's':
+        case 'S': {
+          e.preventDefault();
+          handleUpdateConfig({ showFrequencySpectrumHUD: !configRef.current.showFrequencySpectrumHUD });
+          break;
+        }
         case 'o':
         case 'O': {
           e.preventDefault();
@@ -465,6 +481,17 @@ export default function App() {
 
       {/* LAYER 4: Clean Screen Single Title Overlay (Only Title on screen, 0 clutter) */}
       <CleanScreenOverlay config={config} themeDef={themeDef} audioAnalysis={liveAnalysis} />
+
+      {/* LAYER 5: Frequency Spectrum Bar Chart using Recharts in HUD overlay */}
+      {config.showFrequencySpectrumHUD && (
+        <div
+          className={`fixed bottom-6 left-6 z-20 w-72 sm:w-80 md:w-96 transition-all duration-300 pointer-events-auto ${
+            isMouseIdle && !isDrawerOpen ? 'opacity-35 hover:opacity-100' : 'opacity-95'
+          }`}
+        >
+          <FrequencySpectrumHUD audioAnalysis={liveAnalysis} themeDef={themeDef} compact={true} />
+        </div>
+      )}
 
       {/* Discreet Audio Start Hint for First-time Autoplay Policy */}
       {!audioEngineRef.current.getIsPlaying() && !isDrawerOpen && (

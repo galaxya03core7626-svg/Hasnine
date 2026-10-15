@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ThemeType, ThemeColors } from '../types/visualizer';
+import { ThemeType, ThemeColors, CustomPalette } from '../types/visualizer';
 
 export interface ThemeDefinition {
-  id: ThemeType;
+  id: ThemeType | string;
   name: string;
   tagline: string;
   colors: ThemeColors;
@@ -15,6 +15,7 @@ export interface ThemeDefinition {
   bloomMultiplier: number;
   chromaticShift: number;
   fontFamily: string;
+  isCustom?: boolean;
 }
 
 export const THEMES: Record<ThemeType, ThemeDefinition> = {
@@ -96,42 +97,169 @@ export const THEMES: Record<ThemeType, ThemeDefinition> = {
   },
 };
 
-export class ThemeManager {
-  private currentTheme: ThemeType = 'Cyberpunk';
-  private allThemes: ThemeType[] = ['Cyberpunk', 'Vintage', 'Fantasy', 'Kinetic'];
+export const INITIAL_CUSTOM_PALETTES: CustomPalette[] = [
+  {
+    id: 'palette_emerald_matrix',
+    name: 'Emerald Matrix',
+    primary: '#10b981',
+    secondary: '#84cc16',
+    accent: '#a7f3d0',
+    background: '#02180e',
+    gridColor: '#10b98133',
+    waveformColor: '#34d399',
+  },
+  {
+    id: 'palette_sunset_synth',
+    name: 'Sunset Synth',
+    primary: '#f43f5e',
+    secondary: '#8b5cf6',
+    accent: '#fde047',
+    background: '#13041a',
+    gridColor: '#f43f5e33',
+    waveformColor: '#fb7185',
+  },
+  {
+    id: 'palette_deep_ocean',
+    name: 'Deep Oceanic',
+    primary: '#06b6d4',
+    secondary: '#3b82f6',
+    accent: '#38bdf8',
+    background: '#030e1c',
+    gridColor: '#0284c733',
+    waveformColor: '#0ea5e9',
+  },
+];
 
-  constructor(initialTheme: ThemeType = 'Cyberpunk') {
-    this.currentTheme = initialTheme;
+const STORAGE_KEY = 'pulsewave_custom_palettes_v1';
+
+export class ThemeManager {
+  private currentThemeId: string = 'Cyberpunk';
+  private allBuiltInThemes: ThemeType[] = ['Cyberpunk', 'Vintage', 'Fantasy', 'Kinetic'];
+  private customPalettes: Map<string, CustomPalette> = new Map();
+
+  constructor(initialTheme: ThemeType | string = 'Cyberpunk') {
+    this.currentThemeId = initialTheme;
+    this.loadCustomPalettes();
   }
 
-  public getTheme(): ThemeType {
-    return this.currentTheme;
+  private loadCustomPalettes() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed: CustomPalette[] = JSON.parse(stored);
+        parsed.forEach((p) => this.customPalettes.set(p.id, p));
+      } else {
+        INITIAL_CUSTOM_PALETTES.forEach((p) => this.customPalettes.set(p.id, p));
+        this.saveCustomPalettes();
+      }
+    } catch {
+      INITIAL_CUSTOM_PALETTES.forEach((p) => this.customPalettes.set(p.id, p));
+    }
+  }
+
+  private saveCustomPalettes() {
+    try {
+      const list = Array.from(this.customPalettes.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not save custom palettes to localStorage', e);
+    }
+  }
+
+  public getTheme(): string {
+    return this.currentThemeId;
   }
 
   public getThemeDef(): ThemeDefinition {
-    return THEMES[this.currentTheme] || THEMES.Cyberpunk;
+    // 1. Check built-in themes
+    if (THEMES[this.currentThemeId as ThemeType]) {
+      return THEMES[this.currentThemeId as ThemeType];
+    }
+
+    // 2. Check custom palettes
+    if (this.customPalettes.has(this.currentThemeId)) {
+      const p = this.customPalettes.get(this.currentThemeId)!;
+      return this.convertPaletteToThemeDef(p);
+    }
+
+    return THEMES.Cyberpunk;
   }
 
-  public setTheme(theme: ThemeType): ThemeDefinition {
-    if (THEMES[theme]) {
-      this.currentTheme = theme;
-    }
+  public convertPaletteToThemeDef(p: CustomPalette): ThemeDefinition {
+    return {
+      id: p.id,
+      name: p.name,
+      tagline: 'User-created custom color aesthetic',
+      colors: {
+        primary: p.primary,
+        secondary: p.secondary,
+        accent: p.accent,
+        background: p.background,
+        gridColor: p.gridColor || `${p.primary}33`,
+        waveformColor: p.waveformColor || p.primary,
+        fontDisplay: "'Plus Jakarta Sans', sans-serif",
+      },
+      particleStyle: 'points',
+      glitchIntensity: 0.8,
+      bloomMultiplier: 1.1,
+      chromaticShift: 0.005,
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      isCustom: true,
+    };
+  }
+
+  public setTheme(themeId: string): ThemeDefinition {
+    this.currentThemeId = themeId;
     return this.getThemeDef();
   }
 
-  public cycleNextTheme(): ThemeType {
-    const idx = this.allThemes.indexOf(this.currentTheme);
-    const nextIdx = (idx + 1) % this.allThemes.length;
-    this.currentTheme = this.allThemes[nextIdx];
-    return this.currentTheme;
+  public saveCustomPalette(p: CustomPalette): ThemeDefinition {
+    this.customPalettes.set(p.id, p);
+    this.saveCustomPalettes();
+    return this.setTheme(p.id);
   }
 
-  public getRandomTheme(): ThemeType {
-    const others = this.allThemes.filter((t) => t !== this.currentTheme);
-    return others[Math.floor(Math.random() * others.length)];
+  public deleteCustomPalette(id: string): void {
+    if (this.customPalettes.has(id)) {
+      this.customPalettes.delete(id);
+      this.saveCustomPalettes();
+      if (this.currentThemeId === id) {
+        this.currentThemeId = 'Cyberpunk';
+      }
+    }
+  }
+
+  public getCustomPalettes(): CustomPalette[] {
+    return Array.from(this.customPalettes.values());
+  }
+
+  public cycleNextTheme(): string {
+    // Cycle across both built-in themes and saved custom palettes!
+    const allIds: string[] = [
+      ...this.allBuiltInThemes,
+      ...Array.from(this.customPalettes.keys()),
+    ];
+
+    const curIdx = allIds.indexOf(this.currentThemeId);
+    const nextIdx = (curIdx + 1) % allIds.length;
+    this.currentThemeId = allIds[nextIdx];
+    return this.currentThemeId;
+  }
+
+  public getRandomTheme(): string {
+    const allIds: string[] = [
+      ...this.allBuiltInThemes,
+      ...Array.from(this.customPalettes.keys()),
+    ];
+    const others = allIds.filter((t) => t !== this.currentThemeId);
+    return others[Math.floor(Math.random() * others.length)] || 'Cyberpunk';
   }
 
   public getAllThemes(): ThemeDefinition[] {
-    return this.allThemes.map((t) => THEMES[t]);
+    const builtIns = this.allBuiltInThemes.map((t) => THEMES[t]);
+    const customs = Array.from(this.customPalettes.values()).map((p) =>
+      this.convertPaletteToThemeDef(p)
+    );
+    return [...builtIns, ...customs];
   }
 }

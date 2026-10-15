@@ -33,6 +33,10 @@ import {
   Activity,
   Zap,
   RotateCcw,
+  Palette,
+  Eye,
+  EyeOff,
+  Plus,
 } from 'lucide-react';
 import {
   VisualizerConfig,
@@ -43,11 +47,13 @@ import {
   AudioAnalysis,
   TextAnimationStyle,
   TextAudioSync,
+  CustomPalette,
 } from '../types/visualizer';
 import { THEMES, ThemeDefinition } from '../engine/ThemeManager';
 import { BUILT_IN_TRACKS, AudioEngine } from '../engine/AudioEngine';
 import { MediaManager } from '../engine/MediaManager';
 import { generateStandaloneHtml } from '../utils/singleHtmlExporter';
+import { FrequencySpectrumHUD } from './FrequencySpectrumHUD';
 
 interface ControlDrawerProps {
   isOpen: boolean;
@@ -96,6 +102,15 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Custom Palette Creator State
+  const [newPaletteName, setNewPaletteName] = useState('');
+  const [newPrimaryColor, setNewPrimaryColor] = useState('#00f0ff');
+  const [newSecondaryColor, setNewSecondaryColor] = useState('#ff007f');
+  const [newAccentColor, setNewAccentColor] = useState('#ffe600');
+  const [newBackgroundColor, setNewBackgroundColor] = useState('#050713');
+  const [newWaveformColor, setNewWaveformColor] = useState('#00f0ff');
+  const [paletteSuccessMsg, setPaletteSuccessMsg] = useState<string | null>(null);
+
   const mediaList = mediaManager.getMediaList();
   const currentMediaIdx = mediaManager.getCurrentIndex();
 
@@ -108,11 +123,18 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
     audioEngine.selectTrack(trackId);
   };
 
-  const handleMicToggle = async () => {
-    if (audioEngine.getSourceType() === 'mic') {
-      audioEngine.selectTrack('synthwave');
+  // Toggle between File/Synth audio source and Live System Microphone
+  const handleToggleSourceMode = async (mode: 'file' | 'mic') => {
+    if (mode === 'mic') {
+      const success = await audioEngine.enableMicrophone();
+      if (!success) {
+        setUploadStatus({
+          type: 'error',
+          message: 'Microphone permission denied or device not found. Reverted to track playback.',
+        });
+      }
     } else {
-      await audioEngine.enableMicrophone();
+      await audioEngine.switchToFileOrSynth();
     }
   };
 
@@ -152,13 +174,11 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
       setUploadProgress(null);
     }, 800);
 
-    // Auto-dismiss success status after 4 seconds
     setTimeout(() => {
       setUploadStatus((prev) => (prev?.type === 'success' ? null : prev));
     }, 4000);
   };
 
-  // Drag and drop event handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -179,6 +199,49 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       await processUploadedFiles(e.dataTransfer.files);
     }
+  };
+
+  // Custom Palette Handlers
+  const handleSaveCustomPalette = () => {
+    if (!newPaletteName.trim()) return;
+
+    const newPal: CustomPalette = {
+      id: `custom_${Date.now()}`,
+      name: newPaletteName.trim(),
+      primary: newPrimaryColor,
+      secondary: newSecondaryColor,
+      accent: newAccentColor,
+      background: newBackgroundColor,
+      gridColor: `${newPrimaryColor}33`,
+      waveformColor: newWaveformColor,
+    };
+
+    const updated = [...(config.customPalettes || []), newPal];
+    onUpdateConfig({
+      customPalettes: updated,
+      theme: newPal.id,
+    });
+
+    setNewPaletteName('');
+    setPaletteSuccessMsg(`Saved and activated custom palette "${newPal.name}"!`);
+    setTimeout(() => setPaletteSuccessMsg(null), 3500);
+  };
+
+  const handleDeleteCustomPalette = (id: string) => {
+    const updated = (config.customPalettes || []).filter((p) => p.id !== id);
+    onUpdateConfig({
+      customPalettes: updated,
+      theme: config.theme === id ? 'Cyberpunk' : config.theme,
+    });
+  };
+
+  const handleCycleAllPalettes = () => {
+    const builtInIds = ['Cyberpunk', 'Vintage', 'Fantasy', 'Kinetic'];
+    const customIds = (config.customPalettes || []).map((p) => p.id);
+    const allIds = [...builtInIds, ...customIds];
+    const curIdx = allIds.indexOf(config.theme);
+    const nextIdx = (curIdx + 1) % allIds.length;
+    onUpdateConfig({ theme: allIds[nextIdx] });
   };
 
   // Export Settings to JSON
@@ -243,6 +306,8 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
     reactivity: 1.0,
     glow: true,
   };
+
+  const isMic = audioEngine.isMicrophoneActive();
 
   return (
     <>
@@ -318,7 +383,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             { id: 'audio', label: 'Audio & Source', icon: Music },
             { id: 'reactivity', label: 'Frequency Reactivity', icon: Activity },
             { id: 'visuals', label: '3D Visuals', icon: Sparkles },
-            { id: 'themes', label: 'Themes & Overlays', icon: Layers },
+            { id: 'themes', label: 'Themes & Palettes', icon: Palette },
             { id: 'media', label: 'Media Gallery', icon: Video },
             { id: 'text', label: 'Dynamic Text', icon: Type },
             { id: 'export', label: 'Export & Settings', icon: Download },
@@ -348,6 +413,63 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
           {/* TAB 1: AUDIO & SOURCE */}
           {activeTab === 'audio' && (
             <div className="space-y-6">
+              {/* Audio Source Segmented Toggle (Files/Tracks vs Live System Microphone) */}
+              <div className="p-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleSourceMode('file')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-semibold transition-all ${
+                    !isMic
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Disc className="w-4 h-4" />
+                  <span>File & Preset Tracks</span>
+                </button>
+
+                <button
+                  onClick={() => handleToggleSourceMode('mic')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-semibold transition-all ${
+                    isMic
+                      ? 'bg-red-500/20 text-red-300 border border-red-500/40 shadow-sm animate-pulse'
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>Live System Microphone</span>
+                </button>
+              </div>
+
+              {/* Status info based on active source */}
+              {isMic ? (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-red-300">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping" />
+                    <span>Live Performance Mode Active: Visualizer is reacting directly to your system microphone</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleSourceMode('file')}
+                    className="px-3 py-1 text-xs rounded bg-white/10 hover:bg-white/15 text-white"
+                  >
+                    Switch to Track
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between text-xs text-cyan-300">
+                  <div className="flex items-center gap-2">
+                    <Music className="w-4 h-4" />
+                    <span>Now Playing: {audioEngine.getCurrentTrackId()}</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleSourceMode('mic')}
+                    className="px-3 py-1 text-xs rounded bg-white/10 hover:bg-white/15 text-white"
+                  >
+                    Enable Microphone
+                  </button>
+                </div>
+              )}
+
+              {/* Playback Controls & Settings */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
                   <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
@@ -422,9 +544,10 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                   </div>
                 </div>
 
+                {/* Live VU Energy Meter */}
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
                   <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
-                    Live Frequency Meters
+                    Real-Time Bands
                   </div>
                   <div className="space-y-2 text-xs">
                     <div>
@@ -470,9 +593,9 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
               {/* Tracks & Input Mode */}
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
-                  Select Audio Source
+                  Preset Synthesizer Tracks
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {BUILT_IN_TRACKS.map((trk) => {
                     const isSelected =
                       audioEngine.getSourceType() === 'synth' &&
@@ -495,23 +618,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                       </button>
                     );
                   })}
-
-                  <button
-                    onClick={handleMicToggle}
-                    className={`p-3 rounded-xl text-left border transition-all ${
-                      audioEngine.getSourceType() === 'mic'
-                        ? 'bg-red-500/20 border-red-400'
-                        : 'bg-white/5 border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Mic className="w-4 h-4 text-red-400" />
-                      <span className="font-semibold text-xs text-white">Live Microphone</span>
-                    </div>
-                    <div className="text-[11px] text-white/50">
-                      {audioEngine.getSourceType() === 'mic' ? 'Active Input' : 'Use Room Audio / Mic'}
-                    </div>
-                  </button>
                 </div>
 
                 <div className="pt-2">
@@ -534,36 +640,39 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             </div>
           )}
 
-          {/* TAB 2: FREQUENCY REACTIVITY */}
+          {/* TAB 2: FREQUENCY REACTIVITY & RECHARTS SPECTRUM */}
           {activeTab === 'reactivity' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <div>
-                  <h3 className="font-semibold text-sm text-white">Frequency Band Tuning</h3>
-                  <p className="text-xs text-white/50">
-                    Balance bass explosions, mid-range geometric pulsing, and treble laser trails.
-                  </p>
+              {/* Recharts Frequency-based Spectrum Bar Chart */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold text-white/70 uppercase tracking-wider">
+                    Real-Time Spectrum Analyzer (Recharts)
+                  </div>
+                  <button
+                    onClick={() =>
+                      onUpdateConfig({ showFrequencySpectrumHUD: !config.showFrequencySpectrumHUD })
+                    }
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      config.showFrequencySpectrumHUD
+                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                        : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    {config.showFrequencySpectrumHUD ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    <span>{config.showFrequencySpectrumHUD ? 'Visible on HUD' : 'Hidden on HUD'} (S)</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() =>
-                    onUpdateConfig({
-                      frequencyReactivity: {
-                        bassBurstIntensity: 1.0,
-                        midPulseIntensity: 1.0,
-                        trebleShimmerIntensity: 1.0,
-                        shockwaveEnabled: true,
-                        trebleTrailsEnabled: true,
-                      },
-                    })
-                  }
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset EQ</span>
-                </button>
+
+                <FrequencySpectrumHUD
+                  audioAnalysis={audioAnalysis}
+                  themeDef={themeDef}
+                  compact={false}
+                />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Band Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                 {/* 1. Bass Frequency Band */}
                 <div className="p-4 rounded-xl bg-white/5 border border-cyan-500/20 space-y-4">
                   <div className="flex items-center justify-between">
@@ -876,67 +985,197 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             </div>
           )}
 
-          {/* TAB 4: THEMES & OVERLAYS */}
+          {/* TAB 4: THEMES & CUSTOM PALETTES */}
           {activeTab === 'themes' && (
             <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
-                    Visual Themes
-                  </div>
-                  <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.isRandomTheme}
-                      onChange={(e) => onUpdateConfig({ isRandomTheme: e.target.checked })}
-                      className="rounded accent-cyan-400"
-                    />
-                    <span>Auto Cycle Themes</span>
-                  </label>
+              {/* Header with Cycle Button */}
+              <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                <div>
+                  <h3 className="font-semibold text-sm text-white">Themes & Custom Color Palettes</h3>
+                  <p className="text-xs text-white/50">
+                    Choose predefined aesthetics or create and save your own custom color palettes.
+                  </p>
                 </div>
+                <button
+                  onClick={handleCycleAllPalettes}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/30 text-xs font-semibold transition-colors"
+                  title="Cycle Palettes (HotKey: C)"
+                >
+                  <Shuffle className="w-3.5 h-3.5" />
+                  <span>Cycle All (C)</span>
+                </button>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  {(Object.keys(THEMES) as ThemeType[]).map((thmKey) => {
+              {/* 1. Predefined Built-In Themes */}
+              <div>
+                <div className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">
+                  Prebuilt Themes
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {(['Cyberpunk', 'Vintage', 'Fantasy', 'Kinetic'] as ThemeType[]).map((thmKey) => {
                     const thm = THEMES[thmKey];
                     const isSelected = config.theme === thmKey;
                     return (
                       <button
                         key={thmKey}
                         onClick={() => onUpdateConfig({ theme: thmKey })}
-                        className={`p-4 rounded-xl text-left border transition-all ${
+                        className={`p-3.5 rounded-xl text-left border transition-all ${
                           isSelected
-                            ? 'bg-white/15 shadow-lg'
+                            ? 'bg-white/15 shadow-lg ring-1 ring-white/30'
                             : 'bg-white/5 border-white/10 hover:bg-white/10'
                         }`}
                         style={{
                           borderColor: isSelected ? thm.colors.primary : undefined,
                         }}
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1.5">
                           <span
-                            className="font-bold text-sm tracking-wide"
+                            className="font-bold text-xs tracking-wide"
                             style={{ color: thm.colors.primary }}
                           >
                             {thm.name}
                           </span>
                           <div className="flex items-center gap-1">
                             <span
-                              className="w-3 h-3 rounded-full"
+                              className="w-2.5 h-2.5 rounded-full"
                               style={{ backgroundColor: thm.colors.primary }}
                             />
                             <span
-                              className="w-3 h-3 rounded-full"
+                              className="w-2.5 h-2.5 rounded-full"
                               style={{ backgroundColor: thm.colors.secondary }}
                             />
                           </div>
                         </div>
-                        <p className="text-[11px] text-white/60">{thm.tagline}</p>
+                        <p className="text-[11px] text-white/50 truncate">{thm.tagline}</p>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
+              {/* 2. Saved Custom Palettes */}
+              <div>
+                <div className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">
+                  Saved Custom Palettes ({config.customPalettes?.length || 0})
+                </div>
+
+                {paletteSuccessMsg && (
+                  <div className="mb-3 p-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{paletteSuccessMsg}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {(config.customPalettes || []).map((pal) => {
+                    const isSelected = config.theme === pal.id;
+                    return (
+                      <div
+                        key={pal.id}
+                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                          isSelected
+                            ? 'bg-white/15 border-cyan-400 ring-1 ring-cyan-400/40 shadow-md'
+                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <button
+                          onClick={() => onUpdateConfig({ theme: pal.id })}
+                          className="flex-1 text-left flex items-center gap-3 overflow-hidden"
+                        >
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-black/40 shadow"
+                              style={{ backgroundColor: pal.primary }}
+                            />
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-black/40 shadow"
+                              style={{ backgroundColor: pal.secondary }}
+                            />
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-black/40 shadow"
+                              style={{ backgroundColor: pal.background }}
+                            />
+                          </div>
+                          <span className="font-semibold text-xs text-white truncate">{pal.name}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteCustomPalette(pal.id)}
+                          className="p-1.5 text-white/40 hover:text-red-400 rounded transition-colors ml-2"
+                          title="Delete custom palette"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Custom Palette Creator Form */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-cyan-400" />
+                  <span className="font-semibold text-xs text-white uppercase tracking-wider">
+                    Create New Custom Palette
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end">
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[11px] text-white/60">Palette Name</label>
+                    <input
+                      type="text"
+                      value={newPaletteName}
+                      onChange={(e) => setNewPaletteName(e.target.value)}
+                      placeholder="e.g. Neon Horizon"
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-white/60">Primary</label>
+                    <input
+                      type="color"
+                      value={newPrimaryColor}
+                      onChange={(e) => setNewPrimaryColor(e.target.value)}
+                      className="w-full h-8 rounded border border-white/20 bg-transparent cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-white/60">Secondary</label>
+                    <input
+                      type="color"
+                      value={newSecondaryColor}
+                      onChange={(e) => setNewSecondaryColor(e.target.value)}
+                      className="w-full h-8 rounded border border-white/20 bg-transparent cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-white/60">Canvas BG</label>
+                    <input
+                      type="color"
+                      value={newBackgroundColor}
+                      onChange={(e) => setNewBackgroundColor(e.target.value)}
+                      className="w-full h-8 rounded border border-white/20 bg-transparent cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={handleSaveCustomPalette}
+                      disabled={!newPaletteName.trim()}
+                      className="w-full py-2 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs disabled:opacity-30 transition-colors"
+                    >
+                      Save Palette
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overlays (Rain, Fire, Love, Stardust) */}
               <div className="space-y-3 pt-2">
                 <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
                   Particle Atmosphere Overlays
@@ -989,7 +1228,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             </div>
           )}
 
-          {/* TAB 5: MEDIA GALLERY & DRAG-AND-DROP UPLOAD */}
+          {/* TAB 5: MEDIA GALLERY */}
           {activeTab === 'media' && (
             <div className="space-y-6">
               {/* Drag and Drop Zone */}
@@ -1025,7 +1264,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                   </p>
                 </div>
 
-                {/* Upload Progress Bar */}
                 {uploadProgress !== null && (
                   <div className="mt-4 max-w-sm mx-auto">
                     <div className="flex justify-between text-xs text-white/70 mb-1">
@@ -1042,7 +1280,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                 )}
               </div>
 
-              {/* Status feedback banner */}
               {uploadStatus && (
                 <div
                   className={`p-3 rounded-xl flex items-center gap-3 text-xs ${
@@ -1136,7 +1373,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                 </button>
               </div>
 
-              {/* Thumbnails Grid with Drag & Delete */}
+              {/* Thumbnails Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {mediaList.map((item, idx) => {
                   const isActive = idx === currentMediaIdx;
@@ -1233,7 +1470,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
               {textOverlay.enabled && (
                 <div className="space-y-5">
-                  {/* Title & Subtitle */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs text-white/70">Main Text Title</label>
@@ -1265,7 +1501,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* Font & Animation Style */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs text-white/70">Font Typography</label>
@@ -1309,7 +1544,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* Audio Sync Target & Reactivity */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs text-white/70">Synchronize With</label>
@@ -1359,7 +1593,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* Size & Position */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs text-white/70">
@@ -1405,7 +1638,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* Colors & Glow */}
                   <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
                     <div className="text-xs font-semibold text-white/80">Colors & Thematic Glow</div>
                     <div className="flex flex-wrap items-center gap-4">
@@ -1551,7 +1783,9 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                   { key: 'H or Esc', desc: 'Toggle / Close Controls Drawer' },
                   { key: 'F', desc: 'Toggle Fullscreen Mode' },
                   { key: 'R', desc: 'Randomize Themes, Modes & Visuals' },
-                  { key: 'T', desc: 'Cycle to Next Visual Theme' },
+                  { key: 'C', desc: 'Cycle Custom & Built-In Palettes' },
+                  { key: 'S', desc: 'Toggle Spectrum HUD Chart' },
+                  { key: 'T', desc: 'Cycle to Next Built-In Theme' },
                   { key: 'V', desc: 'Cycle to Next Visualizer Mode' },
                   { key: 'ArrowRight', desc: 'Next Background Media' },
                   { key: 'ArrowLeft', desc: 'Previous Background Media' },

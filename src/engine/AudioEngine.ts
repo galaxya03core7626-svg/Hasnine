@@ -274,11 +274,37 @@ export class AudioEngine {
       return true;
     } catch (err) {
       console.warn('Microphone access denied or unavailable, falling back to synth track', err);
-      // Graceful fallback to built-in synth
       this.selectTrack('synthwave');
       await this.play();
       return false;
     }
+  }
+
+  public async switchToFileOrSynth(): Promise<void> {
+    if (this.micStream) {
+      this.micStream.getTracks().forEach((t) => t.stop());
+      this.micStream = null;
+    }
+    if (this.micSource && this.analyser) {
+      try {
+        this.micSource.disconnect();
+      } catch (e) {
+        console.warn('Mic disconnect error', e);
+      }
+      this.micSource = null;
+    }
+
+    if (this.audioElement && this.audioElement.src) {
+      this.currentSourceType = 'file';
+      await this.play();
+    } else {
+      this.selectTrack(this.currentTrackId || 'synthwave');
+      await this.play();
+    }
+  }
+
+  public isMicrophoneActive(): boolean {
+    return this.currentSourceType === 'mic';
   }
 
   // --- PROCEDURAL SYNTH ENGINE IMPLEMENTATION ---
