@@ -10,7 +10,14 @@ export type VisualizerMode =
   | 'tunnel'    // Neon Cyber Grid Tunnel
   | 'radial'    // 360 Radial Spectrum & Oscilloscope Wave
   | 'matrix'    // Floating Polyhedral Crystals & Shards
-  | 'aurora';   // Flowing Harmonic Fluid Ribbons
+  | 'aurora'    // Flowing Harmonic Fluid Ribbons
+  | 'cinematic' // Dreamy Love Cinematic 3D (Main Mode)
+  | 'mountain'  // Dreamscape Mountain Romance
+  | 'garden'    // Floating Rose Garden
+  | 'sunset'    // Eternal Love Sunset 3D
+  | 'rainy'     // Rainy Night Romance 3D
+  | 'galaxy'    // Galaxy Love Universe
+  | 'heartbreak'; // Heartbreak Memories 3D
 
 export type TransitionType = 
   | 'fade' 
@@ -18,9 +25,10 @@ export type TransitionType =
   | 'slide' 
   | 'glitch' 
   | 'blur' 
-  | 'dissolve';
+  | 'dissolve'
+  | 'flythrough'; // 3D Camera Fly-through
 
-export type OverlayType = 'none' | 'rain' | 'fire' | 'love' | 'stardust';
+export type OverlayType = 'none' | 'rain' | 'fire' | 'love' | 'stardust' | 'bass-distort';
 
 export interface ThemeColors {
   primary: string;

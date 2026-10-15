@@ -71,6 +71,17 @@ export class VisualEngine {
   private galaxyGeo: THREE.BufferGeometry | null = null;
   private galaxyCount: number = 16000;
 
+  // Lights & Environment
+  private ambientLight: THREE.AmbientLight | null = null;
+  private dirLight1: THREE.DirectionalLight | null = null;
+  private dirLight2: THREE.DirectionalLight | null = null;
+
+  // Dedicated Bass Particle System (0-250Hz)
+  private bassParticles: THREE.Points | null = null;
+  private bassGeo: THREE.BufferGeometry | null = null;
+  private bassCount: number = 2500;
+  private bassVelocities: Float32Array = new Float32Array(2500 * 3);
+
   // 3D Reactive Polyhedra
   private audioOrbGroup: THREE.Group | null = null;
   private audioOrbInnerMesh: THREE.Mesh | null = null;
@@ -161,19 +172,20 @@ export class VisualEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     // Studio Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(this.ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0x00f0ff, 2.5);
-    dirLight1.position.set(15, 20, 15);
-    this.scene.add(dirLight1);
+    this.dirLight1 = new THREE.DirectionalLight(0x00f0ff, 2.5);
+    this.dirLight1.position.set(15, 20, 15);
+    this.scene.add(this.dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0xff007f, 2.0);
-    dirLight2.position.set(-15, -10, 10);
-    this.scene.add(dirLight2);
+    this.dirLight2 = new THREE.DirectionalLight(0xff007f, 2.0);
+    this.dirLight2.position.set(-15, -10, 10);
+    this.scene.add(this.dirLight2);
 
     // Build 3D objects
     this.createGalaxyParticles();
+    this.createBassParticleSystem();
     this.createAudioOrb();
     this.createMidResonanceRings();
     this.createTunnel();
@@ -222,6 +234,51 @@ export class VisualEngine {
 
     this.galaxyParticles = new THREE.Points(this.galaxyGeo, mat);
     this.scene.add(this.galaxyParticles);
+  }
+
+  // Dedicated Bass Particle System (0-250Hz)
+  private createBassParticleSystem() {
+    if (!this.scene) return;
+    this.bassGeo = new THREE.BufferGeometry();
+    const pos = new Float32Array(this.bassCount * 3);
+    const col = new Float32Array(this.bassCount * 3);
+    const sizes = new Float32Array(this.bassCount);
+
+    for (let i = 0; i < this.bassCount; i++) {
+      pos[i * 3] = 0;
+      pos[i * 3 + 1] = 0;
+      pos[i * 3 + 2] = 0;
+
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      const speed = Math.random() * 0.9 + 0.3;
+
+      this.bassVelocities[i * 3] = Math.sin(phi) * Math.cos(theta) * speed;
+      this.bassVelocities[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * speed;
+      this.bassVelocities[i * 3 + 2] = Math.cos(phi) * speed;
+
+      col[i * 3] = 0.0;
+      col[i * 3 + 1] = 0.85;
+      col[i * 3 + 2] = 1.0;
+
+      sizes[i] = Math.random() * 2.5 + 1.2;
+    }
+
+    this.bassGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.bassGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    this.bassGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.PointsMaterial({
+      size: 2.2,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    this.bassParticles = new THREE.Points(this.bassGeo, mat);
+    this.scene.add(this.bassParticles);
   }
 
   // 2. Audio Core Sphere & Wireframe
@@ -866,22 +923,78 @@ export class VisualEngine {
 
     // Mode Visibility
     if (this.galaxyParticles) {
-      this.galaxyParticles.visible = mode === 'cosmic' || mode === 'aurora';
+      this.galaxyParticles.visible = mode === 'cosmic' || mode === 'aurora' || mode === 'cinematic' || mode === 'mountain' || mode === 'garden' || mode === 'sunset' || mode === 'rainy' || mode === 'galaxy' || mode === 'heartbreak';
     }
     if (this.audioOrbGroup) {
-      this.audioOrbGroup.visible = mode === 'cosmic' || mode === 'radial';
+      this.audioOrbGroup.visible = mode === 'cosmic' || mode === 'radial' || mode === 'cinematic' || mode === 'galaxy';
     }
     if (this.midResonanceGroup) {
-      this.midResonanceGroup.visible = mode === 'cosmic' || mode === 'radial';
+      this.midResonanceGroup.visible = mode === 'cosmic' || mode === 'radial' || mode === 'cinematic';
     }
     if (this.tunnelGroup) {
       this.tunnelGroup.visible = mode === 'tunnel';
     }
     if (this.matrixGroup) {
-      this.matrixGroup.visible = mode === 'matrix';
+      this.matrixGroup.visible = mode === 'matrix' || mode === 'heartbreak';
     }
 
-    // A. Galaxy Particles (with Treble Shimmering Modulation)
+    // Romantic / Cinematic lighting tinting based on active mode
+    if (mode === 'cinematic' || mode === 'garden' || mode === 'heartbreak') {
+      if (this.dirLight1) this.dirLight1.color.setHex(0xff2a85);
+      if (this.dirLight2) this.dirLight2.color.setHex(0xff758c);
+    } else if (mode === 'sunset' || mode === 'mountain') {
+      if (this.dirLight1) this.dirLight1.color.setHex(0xffb199);
+      if (this.dirLight2) this.dirLight2.color.setHex(0xff0844);
+    } else if (mode === 'rainy') {
+      if (this.dirLight1) this.dirLight1.color.setHex(0x4facfe);
+      if (this.dirLight2) this.dirLight2.color.setHex(0x00f2fe);
+    } else if (mode === 'galaxy') {
+      if (this.dirLight1) this.dirLight1.color.setHex(0x7f00ff);
+      if (this.dirLight2) this.dirLight2.color.setHex(0xe100ff);
+    }
+
+    // Update Environment Lighting Pulse with Mid-Range (250Hz - 2kHz)
+    const midPulse = audio.mid * (freqCfg.midPulseIntensity || 1.0) * intensity;
+    if (this.dirLight1) this.dirLight1.intensity = 2.5 + midPulse * 3.5;
+    if (this.dirLight2) this.dirLight2.intensity = 2.0 + midPulse * 3.0;
+    if (this.ambientLight) this.ambientLight.intensity = 0.6 + midPulse * 0.9;
+
+    // Update Dedicated Bass Particle System (0-250Hz explosion bursts)
+    if (this.bassParticles && this.bassGeo) {
+      const posAttr = this.bassGeo.getAttribute('position') as THREE.BufferAttribute;
+      const bassEnergy = audio.bass * freqCfg.bassBurstIntensity;
+      const arr = posAttr.array as Float32Array;
+
+      for (let i = 0; i < this.bassCount; i++) {
+        let x = arr[i * 3];
+        let y = arr[i * 3 + 1];
+        let z = arr[i * 3 + 2];
+
+        const vx = this.bassVelocities[i * 3] * (1.0 + bassEnergy * 4.0);
+        const vy = this.bassVelocities[i * 3 + 1] * (1.0 + bassEnergy * 4.0);
+        const vz = this.bassVelocities[i * 3 + 2] * (1.0 + bassEnergy * 4.0);
+
+        x += vx;
+        y += vy;
+        z += vz;
+
+        const distSq = x * x + y * y + z * z;
+        const maxR = 32.0 + bassEnergy * 20.0;
+
+        if (distSq > maxR * maxR || (audio.isBeat && Math.random() < 0.2)) {
+          x = 0;
+          y = 0;
+          z = 0;
+        }
+
+        arr[i * 3] = x;
+        arr[i * 3 + 1] = y;
+        arr[i * 3 + 2] = z;
+      }
+      posAttr.needsUpdate = true;
+    }
+
+    // A. Galaxy Particles (with Treble Shimmering Modulation & Shimmer Tail effect)
     if (this.galaxyParticles && this.galaxyGeo && this.galaxyParticles.visible) {
       const vortexSpd = config.particleVortexSpeed ?? 1.0;
       const react = config.particleReactivity ?? 1.0;
@@ -891,9 +1004,11 @@ export class VisualEngine {
       const scale = (1.0 + audio.bass * 0.3 * intensity * freqCfg.bassBurstIntensity * react) * config.particleSize;
       this.galaxyParticles.scale.set(scale, scale, scale);
 
-      // Treble Shimmer: brighten particles dynamically
+      // Treble Shimmer Tail & Sparkle (2kHz+)
+      const trebleShimmer = audio.treble * freqCfg.trebleShimmerIntensity;
       const mat = this.galaxyParticles.material as THREE.PointsMaterial;
-      mat.opacity = 0.75 + audio.treble * 0.25 * freqCfg.trebleShimmerIntensity;
+      mat.size = (config.particleSize || 1.2) * (1.0 + trebleShimmer * 0.9);
+      mat.opacity = 0.75 + trebleShimmer * 0.25;
     }
 
     // B. Audio Core Orb & Wireframe (Bass Expansion & Mid Modulation)
@@ -1088,9 +1203,9 @@ export class VisualEngine {
       this.drawTrebleLightTrails(ctx);
     }
 
-    // 4. Overlays (Rain, Fire, Love, Stardust)
+    // 4. Overlays (Rain, Fire, Love, Stardust, Bass Distort)
     if (config.overlay !== 'none') {
-      this.drawOverlayParticles(ctx, config.overlay, config.overlayIntensity, themeDef);
+      this.drawOverlayParticles(ctx, config.overlay, config.overlayIntensity, themeDef, audio);
     }
 
     // 5. Beat Glow / Bloom Vignette
@@ -1314,15 +1429,35 @@ export class VisualEngine {
     ctx.restore();
   }
 
-  // Overlays (Rain, Fire, Love, Stardust)
+  // Overlays (Rain, Fire, Love, Stardust, Bass Distort)
   private drawOverlayParticles(
     ctx: CanvasRenderingContext2D,
     type: OverlayType,
     intensity: number,
-    themeDef: ThemeDefinition
+    themeDef: ThemeDefinition,
+    audio: AudioAnalysis
   ) {
     const w = this.width;
     const h = this.height;
+
+    if (type === 'bass-distort') {
+      const bassMag = audio.bass * intensity;
+      if (bassMag > 0.12) {
+        ctx.save();
+        const shakeX = (Math.random() - 0.5) * bassMag * 35;
+        const shakeY = (Math.random() - 0.5) * bassMag * 35;
+        ctx.translate(shakeX, shakeY);
+
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.min(0.75, bassMag * 0.9);
+        ctx.fillStyle = '#ff0055';
+        ctx.fillRect(Math.random() * w * 0.04, Math.random() * h * 0.04, w, h);
+        ctx.fillStyle = '#00f0ff';
+        ctx.fillRect(-Math.random() * w * 0.04, -Math.random() * h * 0.04, w, h);
+        ctx.restore();
+      }
+      return;
+    }
 
     ctx.save();
 

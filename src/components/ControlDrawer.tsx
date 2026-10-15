@@ -842,6 +842,56 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
           {/* TAB 3: 3D VISUALS */}
           {activeTab === 'visuals' && (
             <div className="space-y-6">
+              {/* VIBE PRESETS LIBRARY */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 border border-cyan-500/30 space-y-3 transition-all duration-200 hover:scale-[1.01]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-white">
+                      Visual Presets Library ("Vibes")
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    Instant Vibe Switcher
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    {
+                      name: 'Chill',
+                      desc: 'Cosmic & Fantasy',
+                      settings: { visualizerMode: 'cosmic' as VisualizerMode, effectIntensity: 0.8, bloomStrength: 0.5, particleDensity: 0.8, particleSize: 1.0, particleVortexSpeed: 0.5, particleReactivity: 0.6, cameraKick: false, theme: 'Fantasy' }
+                    },
+                    {
+                      name: 'High Energy',
+                      desc: 'Cyber Tunnel & Beat Kick',
+                      settings: { visualizerMode: 'tunnel' as VisualizerMode, effectIntensity: 2.0, bloomStrength: 1.2, particleDensity: 1.8, particleSize: 1.5, particleVortexSpeed: 2.5, particleReactivity: 1.8, cameraKick: true, theme: 'Cyberpunk' }
+                    },
+                    {
+                      name: 'Dark Ambient',
+                      desc: 'Rainy Moody & Vintage',
+                      settings: { visualizerMode: 'rainy' as VisualizerMode, effectIntensity: 1.0, bloomStrength: 0.8, particleDensity: 1.2, particleSize: 1.2, particleVortexSpeed: 0.8, particleReactivity: 0.9, cameraKick: true, theme: 'Vintage' }
+                    },
+                    {
+                      name: 'Romantic Dream',
+                      desc: 'Cinematic Romance 3D',
+                      settings: { visualizerMode: 'cinematic' as VisualizerMode, effectIntensity: 1.5, bloomStrength: 1.0, particleDensity: 1.5, particleSize: 1.4, particleVortexSpeed: 1.0, particleReactivity: 1.2, cameraKick: true, theme: 'Fantasy' }
+                    },
+                  ].map((vibe) => (
+                    <button
+                      key={vibe.name}
+                      onClick={() => onUpdateConfig(vibe.settings as Partial<VisualizerConfig>)}
+                      className="p-3 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 hover:border-cyan-400 text-left transition-all duration-200 active:scale-95 group shadow-sm hover:shadow-cyan-500/20"
+                    >
+                      <div className="font-semibold text-xs text-white group-hover:text-cyan-300 transition-colors">
+                        {vibe.name}
+                      </div>
+                      <div className="text-[10px] text-white/50 mt-0.5 truncate">{vibe.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* DISPLAY SIZE & RESOLUTION (16:9 & 9:16 FHD) */}
               <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
                 <div className="flex items-center justify-between">
@@ -946,6 +996,13 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                   {[
+                    { id: 'cinematic', name: 'Dreamy Love Cinematic 3D', desc: 'Main Mode: Immersive Romance' },
+                    { id: 'mountain', name: 'Dreamscape Mountain', desc: 'Romance 3D Terrain' },
+                    { id: 'garden', name: 'Floating Rose Garden', desc: 'Romantic Petals & Blooms' },
+                    { id: 'sunset', name: 'Eternal Love Sunset 3D', desc: 'Golden Horizon & Glow' },
+                    { id: 'rainy', name: 'Rainy Night Romance', desc: 'Moody Droplets & Lights' },
+                    { id: 'galaxy', name: 'Galaxy Love Universe', desc: 'Dream Scene Starfield' },
+                    { id: 'heartbreak', name: 'Heartbreak Memories 3D', desc: 'Emotional Shards & Pulse' },
                     { id: 'cosmic', name: 'Cosmic Galaxy', desc: '16,000 Stars & 3D Core' },
                     { id: 'tunnel', name: 'Cyber Tunnel', desc: 'Neon Octagonal Warp' },
                     { id: 'radial', name: '360 Radial', desc: 'Circular Frequency Ring' },
@@ -1319,13 +1376,14 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                 <div className="text-xs font-semibold text-white/60 uppercase tracking-wider">
                   Particle Atmosphere Overlays
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                   {[
                     { id: 'none', label: 'None' },
                     { id: 'rain', label: 'Rain Streaks' },
                     { id: 'fire', label: 'Fire Embers' },
                     { id: 'love', label: 'Hearts' },
                     { id: 'stardust', label: 'Stardust' },
+                    { id: 'bass-distort', label: 'Bass Distort' },
                   ].map((ov) => {
                     const isSelected = config.overlay === ov.id;
                     return (
