@@ -17,7 +17,8 @@ export type VisualizerMode =
   | 'sunset'    // Eternal Love Sunset 3D
   | 'rainy'     // Rainy Night Romance 3D
   | 'galaxy'    // Galaxy Love Universe
-  | 'heartbreak'; // Heartbreak Memories 3D
+  | 'heartbreak' // Heartbreak Memories 3D
+  | 'bio-helix'; // Bio-Genome Helix 3D (Bioscience Skill Mode)
 
 export type TransitionType = 
   | 'fade' 

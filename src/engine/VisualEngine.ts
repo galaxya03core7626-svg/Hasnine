@@ -99,6 +99,9 @@ export class VisualEngine {
   private matrixGroup: THREE.Group | null = null;
   private crystalMeshes: THREE.Mesh[] = [];
 
+  // Bioscience DNA Bio-Genome Helix 3D
+  private bioHelixGroup: THREE.Group | null = null;
+
   // 3D Bass Shockwave Rings
   private shockwaves: ShockwaveRing[] = [];
   private shockwaveGroup: THREE.Group | null = null;
@@ -192,6 +195,50 @@ export class VisualEngine {
     this.createMatrixCrystals();
     this.createBurstSystem();
     this.createShockwaveGroup();
+    this.createBioHelix();
+  }
+
+  // Bioscience DNA Bio-Genome Helix 3D
+  private createBioHelix() {
+    if (!this.scene) return;
+    this.bioHelixGroup = new THREE.Group();
+    const count = 70;
+    const radius = 5.5;
+    const heightStep = 0.75;
+
+    const sphereGeo = new THREE.SphereGeometry(0.32, 16, 16);
+    const rungGeo = new THREE.CylinderGeometry(0.07, 0.07, radius * 2, 8);
+
+    const matA = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.9, roughness: 0.2 });
+    const matB = new THREE.MeshStandardMaterial({ color: 0xff007f, emissive: 0xff007f, emissiveIntensity: 0.9, roughness: 0.2 });
+    const rungMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.6, roughness: 0.3 });
+
+    for (let i = 0; i < count; i++) {
+      const theta = i * 0.35;
+      const y = (i - count / 2) * heightStep;
+
+      const x1 = Math.cos(theta) * radius;
+      const z1 = Math.sin(theta) * radius;
+
+      const x2 = Math.cos(theta + Math.PI) * radius;
+      const z2 = Math.sin(theta + Math.PI) * radius;
+
+      const sphere1 = new THREE.Mesh(sphereGeo, matA);
+      sphere1.position.set(x1, y, z1);
+      this.bioHelixGroup.add(sphere1);
+
+      const sphere2 = new THREE.Mesh(sphereGeo, matB);
+      sphere2.position.set(x2, y, z2);
+      this.bioHelixGroup.add(sphere2);
+
+      const rung = new THREE.Mesh(rungGeo, rungMat);
+      rung.position.set((x1 + x2) / 2, y, (z1 + z2) / 2);
+      rung.rotation.z = Math.PI / 2;
+      rung.rotation.y = -theta;
+      this.bioHelixGroup.add(rung);
+    }
+
+    this.scene.add(this.bioHelixGroup);
   }
 
   // 1. Galaxy Particle Cloud (Cosmic Mode)
@@ -937,8 +984,11 @@ export class VisualEngine {
     if (this.matrixGroup) {
       this.matrixGroup.visible = mode === 'matrix' || mode === 'heartbreak';
     }
+    if (this.bioHelixGroup) {
+      this.bioHelixGroup.visible = mode === 'bio-helix';
+    }
 
-    // Romantic / Cinematic lighting tinting based on active mode
+    // Romantic / Cinematic / Bioscience lighting tinting based on active mode
     if (mode === 'cinematic' || mode === 'garden' || mode === 'heartbreak') {
       if (this.dirLight1) this.dirLight1.color.setHex(0xff2a85);
       if (this.dirLight2) this.dirLight2.color.setHex(0xff758c);
@@ -951,6 +1001,9 @@ export class VisualEngine {
     } else if (mode === 'galaxy') {
       if (this.dirLight1) this.dirLight1.color.setHex(0x7f00ff);
       if (this.dirLight2) this.dirLight2.color.setHex(0xe100ff);
+    } else if (mode === 'bio-helix') {
+      if (this.dirLight1) this.dirLight1.color.setHex(0x00f0ff);
+      if (this.dirLight2) this.dirLight2.color.setHex(0x00ff88);
     }
 
     // Update Environment Lighting Pulse with Mid-Range (250Hz - 2kHz)
@@ -992,6 +1045,14 @@ export class VisualEngine {
         arr[i * 3 + 2] = z;
       }
       posAttr.needsUpdate = true;
+    }
+
+    // Bioscience DNA Bio-Genome Helix 3D Animation
+    if (this.bioHelixGroup && this.bioHelixGroup.visible) {
+      this.bioHelixGroup.rotation.y = t * 0.4 + audio.bass * 1.5 * freqCfg.bassBurstIntensity;
+      this.bioHelixGroup.rotation.x = Math.sin(t * 0.25) * 0.25;
+      const helixScale = 1.0 + audio.mid * 0.5 * intensity * freqCfg.midPulseIntensity;
+      this.bioHelixGroup.scale.set(helixScale, helixScale + audio.bass * 0.35, helixScale);
     }
 
     // A. Galaxy Particles (with Treble Shimmering Modulation & Shimmer Tail effect)

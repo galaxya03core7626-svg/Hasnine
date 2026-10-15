@@ -997,6 +997,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                   {[
                     { id: 'cinematic', name: 'Dreamy Love Cinematic 3D', desc: 'Main Mode: Immersive Romance' },
+                    { id: 'bio-helix', name: 'Bio-Genome Helix 3D', desc: 'Bioscience DNA & Audio React' },
                     { id: 'mountain', name: 'Dreamscape Mountain', desc: 'Romance 3D Terrain' },
                     { id: 'garden', name: 'Floating Rose Garden', desc: 'Romantic Petals & Blooms' },
                     { id: 'sunset', name: 'Eternal Love Sunset 3D', desc: 'Golden Horizon & Glow' },
